@@ -42,32 +42,32 @@ Devvit.addSettings([
 
 // Menu item to open the Mod Panel by creating a post
 Devvit.addMenuItem({
-    label: "Open AutoMod Brain Panel",
+    label: "Open RedBrain Panel",
     location: "subreddit",
     forUserType: "moderator",
     onPress: async (event, context) => {
         try {
             const subreddit = await context.reddit.getCurrentSubreddit();
             const post = await context.reddit.submitPost({
-                title: "AutoMod Brain - Dashboard",
+                title: "RedBrain - Dashboard",
                 subredditName: subreddit.name,
                 preview: (
                     <vstack width="100%" height="100%" alignment="center middle">
-                        <text size="large" weight="bold">Loading AutoMod Brain...</text>
+                        <text size="large" weight="bold">Loading RedBrain...</text>
                     </vstack>
                 )
             });
             context.ui.navigateTo(post);
         } catch (e) {
             console.error("Failed to open mod panel", e);
-            context.ui.showToast("Failed to open AutoMod Brain");
+            context.ui.showToast("Failed to open RedBrain");
         }
     }
 });
 
 // Custom post type
 Devvit.addCustomPostType({
-    name: "AutoModBrainPanel",
+    name: "RedBrainPanel",
     render: ModPanel,
     height: "tall"
 });

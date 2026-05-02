@@ -1,12 +1,12 @@
-# AutoMod Brain
+# RedBrain
 
 A Devvit-based moderation assistant that scores, prioritizes, and explains risky posts and comments to reduce moderator workload.
 
 ## Overview
 
-AutoMod Brain operates completely within Reddit's infrastructure, using the Devvit platform to listen to events, perform logic, and provide a user interface directly in a subreddit.
+RedBrain operates completely within Reddit's infrastructure, using the Devvit platform to listen to events, perform logic, and provide a user interface directly in a subreddit.
 
-When a user posts or comments, AutoMod Brain analyzes the content using heuristics (keywords, domains, repeated patterns) and simulated NLP to assign a risk score. The result is stored securely. Moderators can then access the AutoMod Brain dashboard to review content grouped by risk. Crucially, when a moderator "Approves" or "Removes" an item, the system learns from the decision by dynamically adjusting the internal risk weights of the keywords and domains present.
+When a user posts or comments, RedBrain analyzes the content using heuristics (keywords, domains, repeated patterns) and simulated NLP to assign a risk score. The result is stored securely. Moderators can then access the RedBrain dashboard to review content grouped by risk. Crucially, when a moderator "Approves" or "Removes" an item, the system learns from the decision by dynamically adjusting the internal risk weights of the keywords and domains present.
 
 ## Features
 
@@ -80,4 +80,4 @@ Reddit Post / Comment
    devvit install <subreddit_name>
    ```
 
-After installation, the app works silently in the background. A moderator can initialize the Mod Panel by navigating to a subreddit, opening the moderation menu, and selecting **"Open AutoMod Brain Panel"**.
+After installation, the app works silently in the background. A moderator can initialize the Mod Panel by navigating to a subreddit, opening the moderation menu, and selecting **"Open RedBrain Panel"**.

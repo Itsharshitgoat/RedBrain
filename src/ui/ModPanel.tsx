@@ -71,7 +71,7 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
                 await saveComment(context.redis, item as CommentData);
             }
 
-            await learnFromAction(item.reasons, action, context.redis);
+            await learnFromAction(item.reasons, action, item.content, context.redis);
 
             const currentAnalytics = await getAnalytics(context.redis);
             if (action === "remove") {
@@ -210,7 +210,7 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
 
     return (
         <vstack width="100%" height="100%" padding="medium">
-            <text size="large" weight="bold" alignment="center">AutoMod Brain</text>
+            <text size="large" weight="bold" alignment="center">RedBrain</text>
 
             <hstack gap="small" alignment="center middle">
                 <button appearance={activeTab === "posts" ? "primary" : "secondary"} onPress={() => setActiveTab("posts")}>Posts</button>
