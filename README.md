@@ -18,8 +18,10 @@ The engine evaluates new content based on several factors:
 - **Simulated NLP:** Evaluates content against phrase clusters.
 - **User Heuristics:** Penalizes very new accounts or accounts with low karma.
 
-### 2. Adaptive Learning Loop
-The system actively learns. When a moderator removes a post, the weight of the associated keywords and domains increases. When a post is approved, their weights decrease. Over time, this hones the app's accuracy automatically.
+### 2. Adaptive Learning Loop & ML Pattern Extraction
+The system actively learns in two ways:
+- **Supervised Adjustment:** When a moderator removes a post, the weight of the known keywords and domains increases. When approved, weights decrease.
+- **Unsupervised Pattern Discovery:** When a moderator removes a post or comment, the system's Machine Learning component parses the raw text content, removes stop-words, and extracts new tokens and bigrams (two-word phrases). These unseen patterns are seeded into the tracking logic with a very low initial weight. If the pattern appears in subsequent removed posts, its weight climbs until it reaches the threshold for auto-removal. Over time, this allows RedBrain to autonomously identify and act upon emerging toxic trends without human intervention.
 
 ### 3. Moderator Dashboard (UI)
 The interactive Devvit UI organizes content into three risk tiers:
@@ -51,13 +53,19 @@ Reddit Post / Comment
        ↓
 [ Mod Action (Approve / Remove) ]
        ↓
-[ Learning System ]  --> (Updates weights in Storage)
+[ Learning System (Updates weights & Discovers new NLP patterns) ]
 ```
+
+### Known Bugs/Limitations
+- Due to Reddit API limitations, atomic updates via Redis multi/exec transactions can behave differently in Devvit. The analytic counters are currently updated serially without transactions, making them slightly susceptible to minor race conditions under extremely high load.
+- Analytics numbers for risk bounds are hardcoded to the default limits (70/40) and will not accurately match the configurable UI sensitivity levels without further adjustments.
+- Simulated NLP ignores tokenizing words with internal punctuation resulting in potentially combined tokens not seen in natural language contexts.
+- Extracted bigrams do not account for natural sentence boundaries (e.g. bridging two separate sentences with a stopword removed).
 
 ### Folder Structure
 - `src/index.tsx`: The main entry point containing Devvit configuration, custom settings, menu items, and triggers.
 - `src/core/scorer.ts`: Contains the rule-based logic for assigning risk scores.
-- `src/core/learner.ts`: Logic that dynamically adapts keyword and domain weights based on mod decisions.
+- `src/core/learner.ts`: Logic that dynamically adapts keyword and domain weights and performs ML phrase extraction based on mod decisions.
 - `src/storage/kv.ts`: Handles data persistence using the Devvit Redis Client.
 - `src/triggers/`: Contains the event listener definitions that catch new content.
 - `src/ui/ModPanel.tsx`: The Devvit Blocks user interface components.
