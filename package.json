@@ -1,0 +1,26 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Itsharshitgoat/RedBrain.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Itsharshitgoat/RedBrain/issues"
+  },
+  "homepage": "https://github.com/Itsharshitgoat/RedBrain#readme",
+  "devDependencies": {
+    "@devvit/public-api": "^0.12.22",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
