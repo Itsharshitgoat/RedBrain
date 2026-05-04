@@ -3,7 +3,7 @@ import { RedisClient } from "@devvit/public-api";
 export type Status = "pending" | "approved" | "removed";
 
 export interface ScoreReason {
-    type: "keyword" | "domain" | "pattern" | "user" | "nlp";
+    type: "keyword" | "domain" | "pattern" | "user" | "nlp" | "semantic" | "ml_feature";
     value: string;
     weight: number;
 }
@@ -45,6 +45,11 @@ export interface AnalyticsData {
     highRiskCount: number;
     mediumRiskCount: number;
     lowRiskCount: number;
+}
+
+export interface ModelWeights {
+    localWeights: Record<string, number>;
+    globalWeights: Record<string, number>;
 }
 
 export async function getPost(redis: RedisClient, id: string): Promise<PostData | null> {
@@ -121,7 +126,6 @@ export async function saveAnalytics(redis: RedisClient, analytics: AnalyticsData
     await redis.set('analytics', JSON.stringify(analytics));
 }
 
-// Global lists to store recent items for easy querying
 export async function getRecentPosts(redis: RedisClient): Promise<string[]> {
     const data = await redis.get('recent_posts');
     if (data) return JSON.parse(data);
@@ -129,7 +133,6 @@ export async function getRecentPosts(redis: RedisClient): Promise<string[]> {
 }
 
 export async function saveRecentPosts(redis: RedisClient, postIds: string[]): Promise<void> {
-    // Keep only last 300 posts
     const limited = postIds.slice(0, 300);
     await redis.set('recent_posts', JSON.stringify(limited));
 }
@@ -143,4 +146,17 @@ export async function getRecentComments(redis: RedisClient): Promise<string[]> {
 export async function saveRecentComments(redis: RedisClient, commentIds: string[]): Promise<void> {
     const limited = commentIds.slice(0, 300);
     await redis.set('recent_comments', JSON.stringify(limited));
+}
+
+export async function getModelWeights(redis: RedisClient): Promise<ModelWeights> {
+    const data = await redis.get('model_weights');
+    if (data) return JSON.parse(data);
+    return {
+        localWeights: {},
+        globalWeights: {}
+    };
+}
+
+export async function saveModelWeights(redis: RedisClient, weights: ModelWeights): Promise<void> {
+    await redis.set('model_weights', JSON.stringify(weights));
 }

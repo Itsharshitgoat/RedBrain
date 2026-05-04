@@ -71,7 +71,8 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
                 await saveComment(context.redis, item as CommentData);
             }
 
-            await learnFromAction(item.reasons, action, item.content, context.redis);
+            const enableAdvancedScoring = await context.settings.get("enableAdvancedScoring") as boolean || false;
+            await learnFromAction(item.reasons, action, item.content, context.redis, enableAdvancedScoring);
 
             const currentAnalytics = await getAnalytics(context.redis);
             if (action === "remove") {

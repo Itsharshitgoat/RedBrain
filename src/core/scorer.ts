@@ -1,5 +1,7 @@
 import { ScoreData, ScoreReason, getKeywords, getDomains, getPhrases } from "../storage/kv";
 import { RedisClient } from "@devvit/public-api";
+import { computeMLScore, MLFeatures } from "./ml";
+import { cleanAndTokenize, extractBigrams, computeSemanticScore } from "./nlp";
 
 export async function calculateScore(
     text: string,
@@ -8,6 +10,36 @@ export async function calculateScore(
     redis: RedisClient,
     enableAdvancedScoring: boolean
 ): Promise<ScoreData> {
+
+    // Create parallel execution pipeline
+    const [ruleResult, mlResult] = await Promise.all([
+        computeRuleScore(text, authorAgeDays, authorKarma, redis, enableAdvancedScoring),
+        computeMLScoreWrapper(text, authorAgeDays, authorKarma, redis, enableAdvancedScoring)
+    ]);
+
+    // Rule Engine + ML Merge
+    // Final Score = ML Score * 0.7 + Rule Score * 0.3
+    const finalScoreRaw = (mlResult.score * 0.7) + (ruleResult.score * 0.3);
+    let finalScore = Math.round(finalScoreRaw);
+
+    if (finalScore > 100) finalScore = 100;
+
+    // Combine explanations
+    const reasons = [...ruleResult.reasons];
+    for (const topF of mlResult.topFeatures) {
+        reasons.push({ type: "ml_feature", value: topF.feature, weight: Math.round(topF.weight * 10) / 10 });
+    }
+
+    return { score: finalScore, reasons };
+}
+
+async function computeRuleScore(
+    text: string,
+    authorAgeDays: number,
+    authorKarma: number,
+    redis: RedisClient,
+    enableAdvancedScoring: boolean
+): Promise<{ score: number, reasons: ScoreReason[] }> {
     const keywords = await getKeywords(redis);
     const domains = await getDomains(redis);
     const phrases = await getPhrases(redis);
@@ -25,7 +57,6 @@ export async function calculateScore(
     }
 
     // 2. Domain Matching
-    // Very basic URL extraction
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const urls = text.match(urlRegex) || [];
     for (const url of urls) {
@@ -38,7 +69,6 @@ export async function calculateScore(
     }
 
     // 3. Pattern Matching
-    // ALL CAPS check (if text is > 10 chars and mostly uppercase)
     const lettersOnly = text.replace(/[^a-zA-Z]/g, '');
     if (lettersOnly.length > 10) {
         const uppercaseCount = text.replace(/[^A-Z]/g, '').length;
@@ -48,7 +78,6 @@ export async function calculateScore(
         }
     }
 
-    // Repeated words or emojis could be added here
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     const emojis = text.match(emojiRegex);
     if (emojis && emojis.length >= 3) {
@@ -56,8 +85,16 @@ export async function calculateScore(
         reasons.push({ type: "pattern", value: "Multiple Emojis", weight: 10 });
     }
 
-    // 4. Simulated NLP (Phrases)
+    // 4. NLP & Semantics
     if (enableAdvancedScoring) {
+        const semResult = computeSemanticScore(text);
+        if (semResult.score > 0) {
+            score += semResult.score;
+            for (const match of semResult.matches) {
+                reasons.push({ type: "semantic", value: match, weight: 15 });
+            }
+        }
+
         for (const [phrase, weight] of Object.entries(phrases)) {
             if (lowerText.includes(phrase.toLowerCase())) {
                 score += weight;
@@ -76,10 +113,39 @@ export async function calculateScore(
         reasons.push({ type: "user", value: "Low Karma", weight: 10 });
     }
 
-    // Cap score at 100
-    if (score > 100) {
-        score = 100;
+    return { score, reasons };
+}
+
+export async function computeMLScoreWrapper(
+    text: string,
+    authorAgeDays: number,
+    authorKarma: number,
+    redis: RedisClient,
+    enableAdvancedScoring: boolean
+) {
+    if (!enableAdvancedScoring) {
+        return { score: 0, topFeatures: [] };
     }
 
-    return { score, reasons };
+    const tokens = cleanAndTokenize(text);
+    const bigrams = extractBigrams(tokens);
+
+    // Construct feature vector
+    const features: MLFeatures = {};
+
+    // Add token features
+    for (const token of tokens) {
+        features[`token_${token}`] = (features[`token_${token}`] || 0) + 1;
+    }
+
+    // Add bigram features
+    for (const bigram of bigrams) {
+        features[`bigram_${bigram}`] = (features[`bigram_${bigram}`] || 0) + 1;
+    }
+
+    // Add heuristics
+    features["user_new"] = authorAgeDays < 7 ? 1 : 0;
+    features["user_low_karma"] = authorKarma < 10 ? 1 : 0;
+
+    return await computeMLScore(features, redis);
 }
