@@ -8,9 +8,9 @@ export const STOP_WORDS = new Set([
 export function cleanAndTokenize(text: string): string[] {
     const cleanText = text
         .toLowerCase()
-        .replace(/(https?:\/\/[^\s]+)/g, "") // remove URLs
-        .replace(/[^a-z0-9\s]/g, "")         // remove special chars
-        .replace(/\s+/g, " ")                // normalize whitespace
+        .replace(/(https?:\/\/[^\s]+)/g, " ") // remove URLs entirely and replace with space
+        .replace(/[^a-z0-9\s]/g, " ")         // replace special chars (including punctuation and hyphens) with space
+        .replace(/\s+/g, " ")                 // normalize multiple whitespaces into a single space
         .trim();
 
     return cleanText.split(" ").filter(t => t.length > 0 && !STOP_WORDS.has(t));

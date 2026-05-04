@@ -1,6 +1,6 @@
 import { Devvit, TriggerContext } from "@devvit/public-api";
 import { calculateScore } from "../core/scorer";
-import { PostData, savePost, getRecentPosts, saveRecentPosts, getAnalytics, saveAnalytics } from "../storage/kv";
+import { PostData, savePost, getRecentPosts, saveRecentPosts, updateAnalytics, getThresholds } from "../storage/kv";
 
 export const onPostCreate = {
     event: "PostCreate" as const,
@@ -14,13 +14,10 @@ export const onPostCreate = {
         const enableAdvancedScoring = await context.settings.get("enableAdvancedScoring") as boolean || false;
         const sensitivityRaw = await context.settings.get("sensitivity") as string || "Medium";
 
-        // Adjust threshold based on sensitivity
-        let threshold = 70;
-        if (sensitivityRaw === "High") threshold = 50;
-        if (sensitivityRaw === "Low") threshold = 85;
+        const thresholds = getThresholds(sensitivityRaw);
 
-        let authorAgeDays = 30; // Default safe value
-        let authorKarma = 100; // Default safe value
+        let authorAgeDays = 30;
+        let authorKarma = 100;
         try {
             const author = await context.reddit.getUserById(post.authorId);
             if (author) {
@@ -51,7 +48,7 @@ export const onPostCreate = {
             timestamp: Date.now()
         };
 
-        if (autoRemoveHighRiskPosts && scoreData.score >= threshold) {
+        if (autoRemoveHighRiskPosts && scoreData.score >= thresholds.high) {
             try {
                 await context.reddit.remove(post.id, false);
                 postData.status = "removed";
@@ -66,19 +63,20 @@ export const onPostCreate = {
         recent.unshift(post.id);
         await saveRecentPosts(redis, recent);
 
-        // Simple update for analytics to avoid transaction issues
-        const analytics = await getAnalytics(redis);
-        analytics.totalPosts++;
-        if (scoreData.score >= 70) {
-            analytics.highRiskCount++;
-        } else if (scoreData.score >= 40) {
-            analytics.mediumRiskCount++;
-        } else {
-            analytics.lowRiskCount++;
-        }
-        if (postData.status === "removed") {
-            analytics.removedPosts++;
-        }
-        await saveAnalytics(redis, analytics);
+        // Update analytics with optimistic retry
+        await updateAnalytics(redis, (analytics) => {
+            analytics.totalPosts++;
+            if (scoreData.score >= thresholds.high) {
+                analytics.highRiskCount++;
+            } else if (scoreData.score >= thresholds.medium) {
+                analytics.mediumRiskCount++;
+            } else {
+                analytics.lowRiskCount++;
+            }
+            if (postData.status === "removed") {
+                analytics.removedPosts++;
+            }
+            return analytics;
+        });
     }
 };

@@ -1,5 +1,5 @@
 import { Devvit, useAsync, useState, JSONValue } from "@devvit/public-api";
-import { getAnalytics, getRecentPosts, getRecentComments, getPost, getComment, PostData, CommentData, savePost, saveComment, saveAnalytics, AnalyticsData } from "../storage/kv";
+import { getAnalytics, getRecentPosts, getRecentComments, getPost, getComment, PostData, CommentData, savePost, saveComment, updateAnalytics, AnalyticsData, getThresholds } from "../storage/kv";
 import { learnFromAction } from "../core/learner";
 
 type Tab = "posts" | "comments" | "analytics" | "settings";
@@ -17,6 +17,13 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
         return modId.some(mod => mod.id === context.userId);
     }, { depends: [] });
 
+
+    const { data: thresholdsData } = useAsync(async () => {
+        const sensitivityRaw = await context.settings.get("sensitivity") as string || "Medium";
+        return getThresholds(sensitivityRaw) as unknown as JSONValue;
+    }, { depends: [] });
+
+    const thresholds = (thresholdsData as unknown as { high: number, medium: number }) || { high: 70, medium: 40 };
 
     const { data: analytics, loading: analyticsLoading } = useAsync(async () => {
         const data = await getAnalytics(context.redis);
@@ -74,15 +81,16 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
             const enableAdvancedScoring = await context.settings.get("enableAdvancedScoring") as boolean || false;
             await learnFromAction(item.reasons, action, item.content, context.redis, enableAdvancedScoring);
 
-            const currentAnalytics = await getAnalytics(context.redis);
-            if (action === "remove") {
-                if (type === "post") currentAnalytics.removedPosts++;
-                else currentAnalytics.removedComments++;
-            } else {
-                if (type === "post") currentAnalytics.approvedPosts++;
-                else currentAnalytics.approvedComments++;
-            }
-            await saveAnalytics(context.redis, currentAnalytics);
+            await updateAnalytics(context.redis, (currentAnalytics) => {
+                if (action === "remove") {
+                    if (type === "post") currentAnalytics.removedPosts++;
+                    else currentAnalytics.removedComments++;
+                } else {
+                    if (type === "post") currentAnalytics.approvedPosts++;
+                    else currentAnalytics.approvedComments++;
+                }
+                return currentAnalytics;
+            });
 
             context.ui.showToast(`Successfully ${action}d!`);
             setActionCounter(prev => prev + 1);
@@ -101,10 +109,10 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
     const renderItem = (item: PostData | CommentData, type: "post" | "comment") => {
         let riskLabel = "Low Risk";
         let riskColor = "neutral-background";
-        if (item.score >= 70) {
+        if (item.score >= thresholds.high) {
             riskLabel = "High Risk";
             riskColor = "red-background";
-        } else if (item.score >= 40) {
+        } else if (item.score >= thresholds.medium) {
             riskLabel = "Medium Risk";
             riskColor = "yellow-background";
         }
@@ -128,9 +136,9 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
         const posts = recentPostsData as unknown as PostData[];
         if (!posts || posts.length === 0) return <text>No pending posts to review.</text>;
 
-        const high = posts.filter((p: PostData) => p.score >= 70);
-        const medium = posts.filter((p: PostData) => p.score >= 40 && p.score < 70);
-        const low = posts.filter((p: PostData) => p.score < 40);
+        const high = posts.filter((p: PostData) => p.score >= thresholds.high);
+        const medium = posts.filter((p: PostData) => p.score >= thresholds.medium && p.score < thresholds.high);
+        const low = posts.filter((p: PostData) => p.score < thresholds.medium);
 
         return (
             <vstack gap="medium">
@@ -151,9 +159,9 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
         const comments = recentCommentsData as unknown as CommentData[];
         if (!comments || comments.length === 0) return <text>No pending comments to review.</text>;
 
-        const high = comments.filter((c: CommentData) => c.score >= 70);
-        const medium = comments.filter((c: CommentData) => c.score >= 40 && c.score < 70);
-        const low = comments.filter((c: CommentData) => c.score < 40);
+        const high = comments.filter((c: CommentData) => c.score >= thresholds.high);
+        const medium = comments.filter((c: CommentData) => c.score >= thresholds.medium && c.score < thresholds.high);
+        const low = comments.filter((c: CommentData) => c.score < thresholds.medium);
 
         return (
             <vstack gap="medium">
@@ -185,9 +193,9 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
                 <text>Approved Comments: {typedAnalytics.approvedComments}</text>
 
                 <text size="large" weight="bold">Risk Breakdown</text>
-                <text>High: {typedAnalytics.highRiskCount}</text>
-                <text>Medium: {typedAnalytics.mediumRiskCount}</text>
-                <text>Low: {typedAnalytics.lowRiskCount}</text>
+                <text>High ({`>=${thresholds.high}`}): {typedAnalytics.highRiskCount}</text>
+                <text>Medium ({`${thresholds.medium}-${thresholds.high-1}`}): {typedAnalytics.mediumRiskCount}</text>
+                <text>Low ({`<${thresholds.medium}`}): {typedAnalytics.lowRiskCount}</text>
             </vstack>
         );
     };

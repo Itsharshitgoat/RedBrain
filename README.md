@@ -15,7 +15,7 @@ When a user posts or comments, RedBrain analyzes the content using heuristics (k
 ```text
 Reddit Post / Comment
        ↓
-[ Text Preprocessing (Stopwords, Bigrams) ]
+[ Text Preprocessing (Stopwords, Bigrams, Boundary Normalization) ]
        ↓
 [ Parallel Execution ]
   ├── [ Rule Engine ]
@@ -37,8 +37,8 @@ RedBrain hooks into Reddit events using `Devvit.addTrigger`. Specifically, it li
 1. It fetches the author's age and karma.
 2. It fetches the subreddit's specific RedBrain settings (Sensitivity, Auto-remove toggles, and ML scoring toggles).
 3. It passes this data to the Scorer.
-4. If the final score exceeds the user-configured Sensitivity threshold (e.g., 70 for Medium, 50 for High), RedBrain uses the Reddit API to automatically remove the post.
-5. It saves the item data and updates global analytics counters in Redis.
+4. If the final score exceeds the dynamically generated threshold based on sensitivity, RedBrain uses the Reddit API to automatically remove the post.
+5. It saves the item data and updates global analytics counters in Redis (utilizing optimistic retries to prevent race conditions).
 
 ### 2. Hybrid Scoring Engine (`src/core/scorer.ts`)
 To keep latency low, the engine evaluates new content using parallel execution (`Promise.all`) of two distinct layers. The final score is a hybrid merge (ML: 70%, Rule Engine: 30%).
@@ -52,7 +52,7 @@ To keep latency low, the engine evaluates new content using parallel execution (
 
 #### Layer B: ML Engine (Logistic Regression)
 - Implemented in `src/core/ml.ts`.
-- **Text Preprocessing:** Handled by `src/core/nlp.ts`. The text is lowercased, URLs and special characters are stripped, and common stop words ("the", "and", "is", etc.) are removed to reduce noise.
+- **Text Preprocessing:** Handled by `src/core/nlp.ts`. The text is lowercased, URLs are removed, and all special characters and hyphens are replaced with whitespace boundaries. Common stop words are removed to reduce noise.
 - **Feature Extraction:** It converts the remaining tokens and bigrams (two-word phrases) into a numerical feature vector, merging it with user heuristics.
 - **Calculation:** It fetches learned weights from Redis. It calculates `z` (the sum of feature weights multiplied by their occurrence). The weights are a blend of Local (Subreddit-specific, 70% weight) and Global (Cross-subreddit, 30% weight) knowledge. Finally, it passes `z` through a sigmoid function `1 / (1 + Math.exp(-z))` to generate a 0-100 probability score.
 
@@ -62,17 +62,22 @@ The system actively learns in two ways when a moderator interacts with the UI:
 - **Online ML Learning (Gradient Descent):**
   1. The system compares the model's prediction against the human reality (Removed = Target 1, Approved = Target 0).
   2. It calculates the error: `error = prediction - target`.
-  3. It runs a simplified gradient descent algorithm to update the feature weights: `weight = weight - (LEARNING_RATE * error * feature_value)`.
+  3. It runs a simplified gradient descent algorithm to update the feature weights.
   4. Both Local and Global weights are updated and saved back to Redis.
 
-### 4. Unsupervised Pattern Discovery
-When a moderator removes a post or comment, the system's Machine Learning component parses the raw text content, removes stop-words, and extracts new tokens and bigrams. These previously unseen patterns are seeded into the tracking logic with a very low initial weight. If the pattern appears in subsequent removed posts, its weight climbs until it reaches the threshold for auto-removal.
+### 4. Unsupervised Pattern Discovery & Decay
+When a moderator removes a post or comment, the system parses the raw text content, removes stop-words, and extracts new tokens and bigrams. These previously unseen patterns are seeded into the tracking logic with a very low initial weight.
+
+To prevent KV storage explosion and Model Drift:
+- The system keeps track of token usage frequencies.
+- Periodic decays (`weight *= 0.98`) are applied to all stored features during the learning loops.
+- Storage logic strictly caps the tracked item counts by sorting out low-frequency and low-weight variables, storing only the absolute most valuable identifiers for toxicity constraints.
 
 ### 5. Moderator Dashboard UI (`src/ui/ModPanel.tsx`)
-The interactive Devvit UI uses Devvit Blocks to organize content into three risk tiers:
-- 🔴 **High Risk** (Score 70+)
-- 🟡 **Medium Risk** (Score 40-69)
-- 🟢 **Low Risk** (Score < 40)
+The interactive Devvit UI uses Devvit Blocks to organize content into three risk tiers mapped precisely to your active sensitivity settings:
+- 🔴 **High Risk**
+- 🟡 **Medium Risk**
+- 🟢 **Low Risk**
 
 The UI features:
 - **Security Check:** A hook verifies that the viewing user is in the `getModerators` list. Non-mods receive an "Access Denied" screen.
@@ -81,18 +86,10 @@ The UI features:
 
 ### 6. Settings Configuration
 Via Devvit Mod Tools, moderators can customize the app:
-- **Sensitivity (Low / Medium / High):** Adjusts the threshold for what is considered a "High Risk" score for automated removals (Low = 85, Medium = 70, High = 50).
+- **Sensitivity (Low / Medium / High):** Adjusts the threshold for what is considered a "High Risk" score for automated removals and UI grouping (Low = 80/50, Medium = 70/40, High = 60/30).
 - **Auto-remove high risk posts:** Automatically removes posts that exceed the risk threshold.
 - **Auto-remove high risk comments:** Automatically removes comments that exceed the risk threshold.
 - **Enable NLP-based scoring:** Toggles the ML logistic regression model and semantic checks.
-
----
-
-## Known Bugs/Limitations
-- Due to Reddit API limitations, atomic updates via Redis multi/exec transactions can behave differently in Devvit. The analytic counters are currently updated serially without transactions, making them slightly susceptible to minor race conditions under extremely high load.
-- Analytics numbers for risk bounds are hardcoded to the default limits (70/40) in the dashboard display and will not dynamically update if the sensitivity threshold is changed.
-- The ML engine currently stores unstructured bigrams and tokens endlessly inside the Redis instances; without a pruning mechanism for low-usage tokens, KV limits may eventually be breached in high-volume subreddits over years of operation.
-- Unsupervised phrase extraction ignores tokenizing words with internal punctuation resulting in potentially combined tokens not seen in natural language contexts.
 
 ---
 

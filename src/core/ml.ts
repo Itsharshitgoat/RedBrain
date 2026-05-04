@@ -31,8 +31,8 @@ export async function computeMLScore(
     for (const [feature, val] of Object.entries(features)) {
         if (val === 0) continue;
 
-        const localW = local[feature] || 0;
-        const globalW = global[feature] || 0;
+        const localW = local[feature]?.weight || 0;
+        const globalW = global[feature]?.weight || 0;
         const finalW = (0.7 * localW) + (0.3 * globalW);
 
         const contribution = finalW * val;
@@ -44,8 +44,8 @@ export async function computeMLScore(
     }
 
     // Add bias
-    const biasLocal = local["__bias__"] || 0;
-    const biasGlobal = global["__bias__"] || 0;
+    const biasLocal = local["__bias__"]?.weight || 0;
+    const biasGlobal = global["__bias__"]?.weight || 0;
     z += (0.7 * biasLocal) + (0.3 * biasGlobal);
 
     const probability = sigmoid(z);

@@ -1,6 +1,6 @@
 import { Devvit, TriggerContext } from "@devvit/public-api";
 import { calculateScore } from "../core/scorer";
-import { CommentData, saveComment, getRecentComments, saveRecentComments, getAnalytics, saveAnalytics } from "../storage/kv";
+import { CommentData, saveComment, getRecentComments, saveRecentComments, updateAnalytics, getThresholds } from "../storage/kv";
 
 export const onCommentCreate = {
     event: "CommentCreate" as const,
@@ -13,10 +13,7 @@ export const onCommentCreate = {
         const enableAdvancedScoring = await context.settings.get("enableAdvancedScoring") as boolean || false;
         const sensitivityRaw = await context.settings.get("sensitivity") as string || "Medium";
 
-        let threshold = 70;
-        if (sensitivityRaw === "High") threshold = 50;
-        if (sensitivityRaw === "Low") threshold = 85;
-
+        const thresholds = getThresholds(sensitivityRaw);
 
         let authorAgeDays = 30;
         let authorKarma = 100;
@@ -50,7 +47,7 @@ export const onCommentCreate = {
             timestamp: Date.now()
         };
 
-        if (autoRemoveHighRiskComments && scoreData.score >= threshold) {
+        if (autoRemoveHighRiskComments && scoreData.score >= thresholds.high) {
             try {
                 await context.reddit.remove(comment.id, false);
                 commentData.status = "removed";
@@ -65,11 +62,12 @@ export const onCommentCreate = {
         recent.unshift(comment.id);
         await saveRecentComments(redis, recent);
 
-        const analytics = await getAnalytics(redis);
-        analytics.totalComments++;
-        if (commentData.status === "removed") {
-            analytics.removedComments++;
-        }
-        await saveAnalytics(redis, analytics);
+        await updateAnalytics(redis, (analytics) => {
+            analytics.totalComments++;
+            if (commentData.status === "removed") {
+                analytics.removedComments++;
+            }
+            return analytics;
+        });
     }
 };

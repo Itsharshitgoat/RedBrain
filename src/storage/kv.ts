@@ -47,9 +47,29 @@ export interface AnalyticsData {
     lowRiskCount: number;
 }
 
+// Upgraded model structures
+export interface WeightData {
+    weight: number;
+    frequency: number;
+    lastSeen: number;
+}
+
 export interface ModelWeights {
-    localWeights: Record<string, number>;
-    globalWeights: Record<string, number>;
+    localWeights: Record<string, WeightData>;
+    globalWeights: Record<string, WeightData>;
+}
+
+export function getThresholds(sensitivity: string) {
+    switch (sensitivity) {
+        case "Low":
+            return { high: 80, medium: 50 };
+        case "Medium":
+            return { high: 70, medium: 40 };
+        case "High":
+            return { high: 60, medium: 30 };
+        default:
+            return { high: 70, medium: 40 }; // default medium
+    }
 }
 
 export async function getPost(redis: RedisClient, id: string): Promise<PostData | null> {
@@ -122,8 +142,19 @@ export async function getAnalytics(redis: RedisClient): Promise<AnalyticsData> {
     };
 }
 
-export async function saveAnalytics(redis: RedisClient, analytics: AnalyticsData): Promise<void> {
-    await redis.set('analytics', JSON.stringify(analytics));
+export async function updateAnalytics(redis: RedisClient, updateFn: (data: AnalyticsData) => AnalyticsData): Promise<void> {
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            const data = await getAnalytics(redis);
+            const updated = updateFn(data);
+            await redis.set('analytics', JSON.stringify(updated));
+            return;
+        } catch (e) {
+            retries--;
+            if (retries === 0) console.error("Failed to update analytics after 3 retries", e);
+        }
+    }
 }
 
 export async function getRecentPosts(redis: RedisClient): Promise<string[]> {
@@ -149,7 +180,7 @@ export async function saveRecentComments(redis: RedisClient, commentIds: string[
 }
 
 export async function getModelWeights(redis: RedisClient): Promise<ModelWeights> {
-    const data = await redis.get('model_weights');
+    const data = await redis.get('model_weights_v2');
     if (data) return JSON.parse(data);
     return {
         localWeights: {},
@@ -158,5 +189,5 @@ export async function getModelWeights(redis: RedisClient): Promise<ModelWeights>
 }
 
 export async function saveModelWeights(redis: RedisClient, weights: ModelWeights): Promise<void> {
-    await redis.set('model_weights', JSON.stringify(weights));
+    await redis.set('model_weights_v2', JSON.stringify(weights));
 }
