@@ -1,12 +1,12 @@
-# RedBrain
+# Sky For Redbrain
 
 A Devvit-based moderation assistant that scores, prioritizes, and explains risky posts and comments to reduce moderator workload.
 
 ## Overview
 
-RedBrain operates completely within Reddit's infrastructure, using the Devvit platform to listen to events, perform logic, and provide a user interface directly in a subreddit.
+Sky For Redbrain operates completely within Reddit's infrastructure, using the Devvit platform to listen to events, perform logic, and provide a user interface directly in a subreddit.
 
-When a user posts or comments, RedBrain analyzes the content using heuristics (keywords, domains, repeated patterns) and a machine learning (ML) text classification engine to assign a risk score. All scoring operations are optimized to complete within sub-100ms latency using parallel execution and lightweight models. The result is stored securely using Devvit's Redis client. Moderators can then access the RedBrain dashboard to review content grouped by risk.
+When a user posts or comments, Sky For Redbrain analyzes the content using heuristics (keywords, domains, repeated patterns) and a machine learning (ML) text classification engine to assign a risk score. All scoring operations are optimized to complete within sub-100ms latency using parallel execution and lightweight models. The result is stored securely using Devvit's Redis client. Moderators can then access the Sky For Redbrain dashboard to review content grouped by risk.
 
 Crucially, when a moderator "Approves" or "Removes" an item, the system learns from the decision by dynamically adjusting the internal risk weights of the keywords, domains, and the ML model parameters via gradient descent. Updates are batched and rate-limited to prevent instability.
 
@@ -15,7 +15,7 @@ Crucially, when a moderator "Approves" or "Removes" an item, the system learns f
 ## Key Differentiators
 
 1. **Adaptive Learning:**
-   Unlike static AutoModerator rules, RedBrain evolves based on moderator decisions.
+   Unlike static AutoModerator rules, Sky For Redbrain evolves based on moderator decisions.
 
 2. **Prioritized Moderation:**
    Instead of a flat queue, moderators focus on high-risk content first, broken down by dynamic thresholds.
@@ -51,11 +51,11 @@ Reddit Post / Comment
 ```
 
 ### 1. Triggers and Entry Points (`src/triggers/`)
-RedBrain hooks into Reddit events using `Devvit.addTrigger`. Specifically, it listens to `onPostCreate` and `onCommentCreate`. Whenever content is submitted:
+Sky For Redbrain hooks into Reddit events using `Devvit.addTrigger`. Specifically, it listens to `onPostCreate` and `onCommentCreate`. Whenever content is submitted:
 1. It fetches the author's age and karma.
-2. It fetches the subreddit's specific RedBrain settings (Sensitivity, Auto-remove toggles, and ML scoring toggles).
+2. It fetches the subreddit's specific Sky For Redbrain settings (Sensitivity, Auto-remove toggles, and ML scoring toggles).
 3. It passes this data to the Scorer.
-4. If the final score exceeds the dynamically generated threshold based on sensitivity **and** the engine has a `confidence > 0.85`, RedBrain uses the Reddit API to automatically remove the post. Auto-removal is conservative and can be disabled; all actions are reversible.
+4. If the final score exceeds the dynamically generated threshold based on sensitivity **and** the engine has a `confidence > 0.85`, Sky For Redbrain uses the Reddit API to automatically remove the post. Auto-removal is conservative and can be disabled; all actions are reversible.
 5. It saves the item data and updates global analytics counters in Redis. Analytics updates use optimistic retry logic to mitigate race conditions under concurrent events.
 
 ### 2. Hybrid Scoring Engine (`src/core/scorer.ts`)
@@ -113,7 +113,7 @@ Via Devvit Mod Tools, moderators can customize the app:
 
 ## Full Usage & Installation Guide
 
-To deploy RedBrain to a subreddit, follow these steps using the terminal.
+To deploy Sky For Redbrain to a subreddit, follow these steps using the terminal.
 
 ### Prerequisites
 1. Ensure you have **Node.js** (v18+) and **npm** installed.
@@ -123,7 +123,7 @@ To deploy RedBrain to a subreddit, follow these steps using the terminal.
    ```
 
 ### 1. Build the Application
-Navigate to the root directory of the RedBrain source code and install the dependencies:
+Navigate to the root directory of the Sky For Redbrain source code and install the dependencies:
 ```bash
 npm install
 ```
@@ -151,9 +151,9 @@ devvit install your_test_subreddit
 ```
 
 ### 5. Configuration & Usage
-Once installed, RedBrain is active. To configure it and use the dashboard:
+Once installed, Sky For Redbrain is active. To configure it and use the dashboard:
 
 1. **Open Reddit:** Go to your subreddit on desktop or mobile.
-2. **Configure Settings:** Navigate to **Mod Tools -> Apps -> RedBrain**. Here you can adjust the "Sensitivity", enable "Auto-remove", and toggle the "NLP-based scoring" feature.
-3. **Open the Dashboard:** As a moderator, click the "Create Post" button or view the subreddit overflow menu to find the action **"Open RedBrain Panel"**.
+2. **Configure Settings:** Navigate to **Mod Tools -> Apps -> Sky For Redbrain**. Here you can adjust the "Sensitivity", enable "Auto-remove", and toggle the "NLP-based scoring" feature.
+3. **Open the Dashboard:** As a moderator, click the "Create Post" button or view the subreddit overflow menu to find the action **"Open Sky For Redbrain Panel"**.
 4. **Take Action:** Clicking the menu item will generate a private, custom interface post visible only to you. You can click between the Posts, Comments, and Analytics tabs to review content and click "Approve" or "Remove" to train the AI.
