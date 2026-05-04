@@ -42,32 +42,32 @@ Devvit.addSettings([
 
 // Menu item to open the Mod Panel by creating a post
 Devvit.addMenuItem({
-    label: "Open RedBrain Panel",
+    label: "Open Sky For Redbrain Panel",
     location: "subreddit",
     forUserType: "moderator",
     onPress: async (event, context) => {
         try {
             const subreddit = await context.reddit.getCurrentSubreddit();
             const post = await context.reddit.submitPost({
-                title: "RedBrain - Dashboard",
+                title: "Sky For Redbrain - Dashboard",
                 subredditName: subreddit.name,
                 preview: (
                     <vstack width="100%" height="100%" alignment="center middle">
-                        <text size="large" weight="bold">Loading RedBrain...</text>
+                        <text size="large" weight="bold">Loading Sky For Redbrain...</text>
                     </vstack>
                 )
             });
             context.ui.navigateTo(post);
         } catch (e) {
             console.error("Failed to open mod panel", e);
-            context.ui.showToast("Failed to open RedBrain");
+            context.ui.showToast("Failed to open Sky For Redbrain");
         }
     }
 });
 
 // Custom post type
 Devvit.addCustomPostType({
-    name: "RedBrainPanel",
+    name: "Sky For RedbrainPanel",
     render: ModPanel,
     height: "tall"
 });

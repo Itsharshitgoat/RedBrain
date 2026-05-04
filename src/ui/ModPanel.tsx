@@ -219,7 +219,7 @@ export const ModPanel: Devvit.CustomPostComponent = (context) => {
 
     return (
         <vstack width="100%" height="100%" padding="medium">
-            <text size="large" weight="bold" alignment="center">RedBrain</text>
+            <text size="large" weight="bold" alignment="center">Sky For Redbrain</text>
 
             <hstack gap="small" alignment="center middle">
                 <button appearance={activeTab === "posts" ? "primary" : "secondary"} onPress={() => setActiveTab("posts")}>Posts</button>
