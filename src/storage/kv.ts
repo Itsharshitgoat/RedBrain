@@ -10,6 +10,7 @@ export interface ScoreReason {
 
 export interface ScoreData {
     score: number;
+    confidence: number;
     reasons: ScoreReason[];
 }
 
@@ -19,6 +20,7 @@ export interface PostData {
     content: string;
     author: string;
     score: number;
+    confidence: number;
     reasons: ScoreReason[];
     status: Status;
     timestamp: number;
@@ -30,6 +32,7 @@ export interface CommentData {
     content: string;
     author: string;
     score: number;
+    confidence: number;
     reasons: ScoreReason[];
     status: Status;
     timestamp: number;

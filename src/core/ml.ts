@@ -7,6 +7,7 @@ export interface MLFeatures {
 
 export interface MLResult {
     score: number;
+    probability: number;
     topFeatures: { feature: string, weight: number }[];
 }
 
@@ -55,6 +56,7 @@ export async function computeMLScore(
 
     return {
         score,
+        probability,
         topFeatures: featureContributions.slice(0, 3)
     };
 }

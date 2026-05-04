@@ -42,12 +42,13 @@ export const onCommentCreate = {
             content: comment.body,
             author: comment.authorId,
             score: scoreData.score,
+            confidence: scoreData.confidence,
             reasons: scoreData.reasons,
             status: "pending",
             timestamp: Date.now()
         };
 
-        if (autoRemoveHighRiskComments && scoreData.score >= thresholds.high) {
+        if (autoRemoveHighRiskComments && scoreData.score >= thresholds.high && scoreData.confidence > 0.85) {
             try {
                 await context.reddit.remove(comment.id, false);
                 commentData.status = "removed";

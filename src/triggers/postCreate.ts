@@ -43,12 +43,13 @@ export const onPostCreate = {
             content: post.body || "",
             author: post.authorId,
             score: scoreData.score,
+            confidence: scoreData.confidence,
             reasons: scoreData.reasons,
             status: "pending",
             timestamp: Date.now()
         };
 
-        if (autoRemoveHighRiskPosts && scoreData.score >= thresholds.high) {
+        if (autoRemoveHighRiskPosts && scoreData.score >= thresholds.high && scoreData.confidence > 0.85) {
             try {
                 await context.reddit.remove(post.id, false);
                 postData.status = "removed";

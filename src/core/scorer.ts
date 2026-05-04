@@ -24,13 +24,28 @@ export async function calculateScore(
 
     if (finalScore > 100) finalScore = 100;
 
+    // A rough confidence metric derived from rule matches and ML certainty (probability away from 0.5)
+    let confidence = 0.5;
+    if (enableAdvancedScoring) {
+        // how certain is the ML model? (1 = very certain it's spam or safe, 0.5 = uncertain)
+        const mlCertainty = Math.abs(mlResult.probability - 0.5) * 2;
+
+        // base confidence on ML certainty and if Rule engine strongly agrees
+        confidence = mlCertainty * 0.7 + (ruleResult.score > 0 ? 0.3 : 0);
+    } else {
+        // Rule engine only: confidence scales with the number of triggered reasons
+        confidence = Math.min(1.0, 0.5 + (ruleResult.reasons.length * 0.15));
+    }
+
+    if (confidence > 1.0) confidence = 1.0;
+
     // Combine explanations
     const reasons = [...ruleResult.reasons];
     for (const topF of mlResult.topFeatures) {
         reasons.push({ type: "ml_feature", value: topF.feature, weight: Math.round(topF.weight * 10) / 10 });
     }
 
-    return { score: finalScore, reasons };
+    return { score: finalScore, confidence: Math.round(confidence * 100) / 100, reasons };
 }
 
 async function computeRuleScore(
@@ -124,7 +139,7 @@ export async function computeMLScoreWrapper(
     enableAdvancedScoring: boolean
 ) {
     if (!enableAdvancedScoring) {
-        return { score: 0, topFeatures: [] };
+        return { score: 0, probability: 0.5, topFeatures: [] };
     }
 
     const tokens = cleanAndTokenize(text);
